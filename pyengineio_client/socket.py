@@ -1,6 +1,6 @@
-from pyengineio.transports import TRANSPORTS
-from pyengineio.url import parse_url
-from pyengineio.util import qs_parse
+from pyengineio_client.transports import TRANSPORTS
+from pyengineio_client.url import parse_url
+from pyengineio_client.util import qs_parse
 
 from pyemitter import Emitter
 import logging

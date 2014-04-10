@@ -1,4 +1,4 @@
-from pyengineio.socket import Socket
+from pyengineio_client.socket import Socket
 
 
 def connect(uri, opts=None):

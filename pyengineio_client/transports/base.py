@@ -1,4 +1,4 @@
-from pyengineio.exceptions import TransportError
+from pyengineio_client.exceptions import TransportError
 
 from pyemitter import Emitter
 

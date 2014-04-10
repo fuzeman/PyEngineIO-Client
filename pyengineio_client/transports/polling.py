@@ -1,4 +1,4 @@
-from pyengineio.util import qs
+from pyengineio_client.util import qs
 from .base import Transport
 
 import logging
