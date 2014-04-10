@@ -47,8 +47,34 @@ class Polling(Transport):
 
     def on_data(self, data):
         """Overloads onData to detect payloads."""
-        # TODO Polling.on_data
-        pass
+        log.debug('polling got data %s', data)
+
+        def callback(packet, index, total):
+            # if its the first message we consider the transport open
+            if self.ready_state == 'opening':
+                self.on_open()
+
+            # if its a close packet, we close the ongoing requests
+            if packet.type == 'close':
+                self.on_close()
+                return
+
+            # otherwise bypass onData and handle the message
+            self.on_packet(packet)
+
+        # decode payload
+        # TODO parser.decodePayload(data, this.socket.binaryType, callback);
+
+        # if an event did not trigger closing
+        if self.ready_state != 'closed':
+            # if we got data we're not polling
+            self.polling = False
+            self.emit('pollComplete')
+
+            if self.ready_state == 'open':
+                self.poll()
+            else:
+                log.debug('ignoring poll - transport state "%s"', self.ready_state)
 
     def do_close(self):
         """For polling, send a close packet."""

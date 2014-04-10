@@ -58,4 +58,4 @@ class XHR_Polling(Polling):
 
     def do_poll(self):
         log.debug('xhr poll')
-        self.request(callback=lambda data: self.on_data(data))
+        self.request(callback=self.on_data)
