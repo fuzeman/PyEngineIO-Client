@@ -3,8 +3,8 @@ from pyengineio_client.url import parse_url
 from pyengineio_client.util import qs_parse
 
 from pyemitter import Emitter
-import pyengineio_parser as parser
 from threading import Timer
+import pyengineio_parser as parser
 import json
 import logging
 
