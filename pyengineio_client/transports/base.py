@@ -1,6 +1,7 @@
 from pyengineio_client.exceptions import TransportError
 
 from pyemitter import Emitter
+import pyengineio_parser as parser
 
 
 class Transport(Emitter):
@@ -76,7 +77,8 @@ class Transport(Emitter):
 
         :type data: str
         """
-        # TODO self.on_packet(parser.decode_packet(data, self.socket.binary_type))
+        print data
+        self.on_packet(parser.decode_packet(data, self.socket.binary_type))
 
     def on_packet(self, packet):
         """Called with a decoded packet."""

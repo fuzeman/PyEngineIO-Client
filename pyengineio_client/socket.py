@@ -3,6 +3,9 @@ from pyengineio_client.url import parse_url
 from pyengineio_client.util import qs_parse
 
 from pyemitter import Emitter
+import pyengineio_parser as parser
+from threading import Timer
+import json
 import logging
 
 log = logging.getLogger(__name__)
@@ -53,7 +56,7 @@ class Socket(Emitter):
         self.timestamp_param = opts.get('timestamp_param') or 't'
         self.timestamp_requests = opts.get('timestamp_requests')
 
-        self.transports = opts.get('transports') or ['polling-xhr', 'polling-jsonp', 'websocket']
+        self.transports = opts.get('transports') or ['polling']
 
         self.ready_state = ''
         self.write_buffer = []
@@ -66,6 +69,18 @@ class Socket(Emitter):
 
         self.sid = None
         self.transport = None
+        self.upgrades = None
+
+        self.ping_interval = None
+        self.ping_interval_timer = None
+
+        self.ping_timeout = None
+        self.ping_timeout_timer = None
+
+        self.upgrading = False
+
+        self.write_buffer = []
+        self.prev_buffer_len = 0
 
         self.open()
 
@@ -80,7 +95,7 @@ class Socket(Emitter):
         log.debug('creating transport "%s"', name)
         query = self.query.copy()
 
-        # TODO append engine.io protocol identifier
+        query['EIO'] = str(parser.PROTOCOL)
 
         # transport name
         query['transport'] = name
@@ -142,36 +157,150 @@ class Socket(Emitter):
 
     def on_open(self):
         """Called when connection is deemed open."""
-        raise NotImplementedError()
+        log.debug('socket open')
+        self.ready_state = 'open'
+
+        Socket.prior_websocket_success = 'websocket' == self.transport.name
+
+        self.emit('open')
+        # TODO this.onopen && this.onopen.call(this); ??
+        self.flush()
+
+        # we check for `readyState` in case an `open`
+        # listener already closed the socket
+        if self.ready_state == 'open' and self.upgrade and self.transport.pause:
+            log.debug('starting upgrade probes')
+
+            for upgrade in self.upgrades:
+                self.probe(upgrade)
 
     def on_packet(self, packet):
         """Handles a packet."""
-        raise NotImplementedError()
+        if self.ready_state in ['opening', 'open']:
+            log.debug('socket receive: type "%s", data "%s"', packet.get('type'), packet.get('data'))
+
+            self.emit('packet', packet)
+
+            # Socket is live - any packet counts
+            self.emit('heartbeat')
+
+            p_type = packet.get('type')
+            p_data = packet.get('data')
+
+            if p_type == 'open':
+                return self.on_handshake(json.loads(p_data))
+
+            if p_type == 'pong':
+                return self.set_ping()
+
+            if p_type == 'error':
+                return self.emit('error', Exception('server error', p_data))
+
+            if p_type == 'message':
+                self.emit('data', p_data)
+                self.emit('message', p_data)
+
+                # TODO this.onmessage && this.onmessage.call(this, event);
+                return
+
+        else:
+            log.debug('packet received with socket ready_state "%s"', self.ready_state)
 
     def on_handshake(self, data):
         """Called upon handshake completion."""
-        raise NotImplementedError()
+        self.emit('handshake', data)
 
-    def on_heartbeat(self, timeout):
+        self.sid = data.get('sid')
+        self.transport.query['sid'] = self.sid
+
+        self.upgrades = self.filter_upgrades(data.get('upgrades'))
+
+        self.ping_interval = data.get('pingInterval')
+        self.ping_timeout = data.get('pingTimeout')
+
+        self.on_open()
+        self.set_ping()
+
+        # Prolong liveness of socket on heartbeat
+        self.off('heartbeat', self.on_heartbeat)
+        self.on('heartbeat', self.on_heartbeat)
+
+    def on_heartbeat(self, timeout=None):
         """Resets ping timeout."""
-        raise NotImplementedError()
+        if self.ping_timeout_timer:
+            self.ping_timeout_timer.cancel()
+
+        def timer_callback():
+            if self.ready_state == 'closed':
+                return
+
+            self.on_close('ping timeout')
+
+        if not timeout:
+            timeout = self.ping_interval + self.ping_timeout
+
+        print "ping_timeout_timer reset, timeout: %s" % timeout
+
+        self.ping_timeout_timer = Timer(timeout / 1000, timer_callback)
+        self.ping_timeout_timer.start()
 
     def set_ping(self):
         """Pings server every `self.ping_interval` and expects response
            within `self.ping_timeout` or closes connection."""
-        raise NotImplementedError()
+        if self.ping_interval_timer:
+            self.ping_interval_timer.cancel()
+
+        def timer_callback():
+            log.debug('writing ping packet - expecting pong within %sms', self.ping_timeout)
+            self.ping()
+            self.on_heartbeat(self.ping_timeout)
+
+        print "ping_interval_timer reset, interval: %s" % self.ping_interval
+
+        self.ping_interval_timer = Timer(self.ping_interval / 1000, timer_callback)
+        self.ping_interval_timer.start()
 
     def ping(self):
         """Sends a ping packet."""
-        raise NotImplementedError()
+        self.send_packet('ping')
 
     def on_drain(self):
         """Called on `drain` event"""
-        raise NotImplementedError()
+        for x in range(self.prev_buffer_len):
+            if not self.callback_buffer[x]:
+                continue
+
+            self.callback_buffer[x]()
+
+        self.write_buffer = self.write_buffer[self.prev_buffer_len:]
+        self.callback_buffer = self.callback_buffer[self.prev_buffer_len:]
+
+        # setting prevBufferLen = 0 is very important
+        # for example, when upgrading, upgrade packet is sent over,
+        # and a nonzero prevBufferLen could cause problems on `drain`
+        self.prev_buffer_len = 0
+
+        if not self.write_buffer:
+            self.emit('drain')
+        else:
+            self.flush()
 
     def flush(self):
         """Flush write buffers."""
-        raise NotImplementedError()
+        if self.ready_state == 'closed' or self.upgrading:
+            return
+
+        if not self.transport.writable or not self.write_buffer:
+            return
+
+        log.debug('flushing %d packets in socket', len(self.write_buffer))
+        self.transport.send(self.write_buffer)
+
+        # keep track of current length of writeBuffer
+        # splice writeBuffer and callbackBuffer on `drain`
+        self.prev_buffer_len = len(self.write_buffer)
+
+        self.emit('flush')
 
     def send(self, message, callback=None):
         """Sends a message.
@@ -184,11 +313,11 @@ class Socket(Emitter):
         """
         raise NotImplementedError()
 
-    def send_packet(self, type, data, callback):
+    def send_packet(self, p_type, data=None, callback=None):
         """Sends a packet.
 
-        :param type: packet type.
-        :type type: str
+        :param p_type: packet type.
+        :type p_type: str
 
         :param data: packet data.
         :type data: str
@@ -196,7 +325,13 @@ class Socket(Emitter):
         :param callback: callback function for response
         :type callback: function
         """
-        raise NotImplementedError()
+        packet = {'type': p_type, 'data': data}
+        self.emit('packetCreate', packet)
+
+        self.write_buffer.append(packet)
+        self.callback_buffer.append(callback)
+
+        self.flush()
 
     def close(self):
         """Closes the connection"""
@@ -216,4 +351,4 @@ class Socket(Emitter):
         :param upgrades: server upgrades
         :type upgrades: list
         """
-        raise NotImplementedError()
+        return [u for u in upgrades if u in self.transports]

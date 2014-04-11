@@ -1,6 +1,7 @@
 from pyengineio_client.util import qs
 from .base import Transport
 
+import pyengineio_parser as parser
 import logging
 
 log = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ class Polling(Transport):
 
     def on_data(self, data):
         """Overloads onData to detect payloads."""
-        log.debug('polling got data %s', data)
+        log.debug('polling got data %s', repr(data))
 
         def callback(packet, index, total):
             # if its the first message we consider the transport open
@@ -55,7 +56,7 @@ class Polling(Transport):
                 self.on_open()
 
             # if its a close packet, we close the ongoing requests
-            if packet.type == 'close':
+            if packet['type'] == 'close':
                 self.on_close()
                 return
 
@@ -63,7 +64,7 @@ class Polling(Transport):
             self.on_packet(packet)
 
         # decode payload
-        # TODO parser.decodePayload(data, this.socket.binaryType, callback);
+        parser.decode_payload(data, callback, self.socket.binary_type)
 
         # if an event did not trigger closing
         if self.ready_state != 'closed':
@@ -94,11 +95,11 @@ class Polling(Transport):
     def write(self, packets):
         self.writable = False
 
-        def callback():
+        def write_callback(data):
             self.writable = True
             self.emit('drain')
 
-        # TODO parser.encodePayload(packets, self.force_base64, lambda data: self.do_write(data, callback))
+        parser.encode_payload(packets, lambda data: self.do_write(data, write_callback), self.supports_binary)
 
     def do_write(self, data, callback):
         raise NotImplementedError()

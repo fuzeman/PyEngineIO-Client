@@ -20,7 +20,12 @@ class XHR_Polling(Polling):
         if method == 'GET':
             future = self.session.get(self.uri())
         elif method == 'POST':
-            future = self.session.post(self.uri(), data)
+            future = self.session.post(
+                self.uri(), data,
+
+                # Important for binary requests
+                headers={'Content-Type': 'application/octet-stream'}
+            )
         else:
             self.on_error('Unknown method specified')
 
@@ -33,11 +38,11 @@ class XHR_Polling(Polling):
             response = future.result()
 
             if response.status_code != 200:
-                self.on_error('request returned with status code ' + response.status_code)
+                self.on_error('request returned with status code %s' % response.status_code)
                 return
 
             if callback:
-                callback(data)
+                callback(bytearray(response.content))
 
         future.add_done_callback(on_response)
 
