@@ -239,7 +239,7 @@ class Socket(Emitter):
         if not timeout:
             timeout = self.ping_interval + self.ping_timeout
 
-        print "ping_timeout_timer reset, timeout: %s" % timeout
+        log.debug("ping_timeout_timer updated, timeout: %s" % timeout)
 
         self.ping_timeout_timer = Timer(timeout / 1000, timer_callback)
         self.ping_timeout_timer.start()
@@ -255,7 +255,7 @@ class Socket(Emitter):
             self.ping()
             self.on_heartbeat(self.ping_timeout)
 
-        print "ping_interval_timer reset, interval: %s" % self.ping_interval
+        log.debug("ping_interval_timer updated, interval: %s" % self.ping_interval)
 
         self.ping_interval_timer = Timer(self.ping_interval / 1000, timer_callback)
         self.ping_interval_timer.start()
@@ -302,7 +302,7 @@ class Socket(Emitter):
 
         self.emit('flush')
 
-    def send(self, message, callback=None):
+    def write(self, message, callback=None):
         """Sends a message.
 
         :param message: message
@@ -311,7 +311,8 @@ class Socket(Emitter):
         :param callback: callback function for response
         :type callback: function
         """
-        raise NotImplementedError()
+        self.send_packet('message', message, callback)
+        return self
 
     def send_packet(self, p_type, data=None, callback=None):
         """Sends a packet.
