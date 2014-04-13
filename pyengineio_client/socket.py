@@ -340,11 +340,53 @@ class Socket(Emitter):
 
     def on_error(self, message):
         """Called upon transport error"""
-        raise NotImplementedError()
+        log.debug('socket error %s', message)
+        Socket.prior_websocket_success = False
+
+        self.emit('error', message)
+        # TODO this.onerror && this.onerror.call(this, err) ??
+
+        self.on_close('transport error  %s' % message)
 
     def on_close(self, reason, desc=None):
         """Called upon transport close"""
-        raise NotImplementedError()
+        if self.ready_state not in ['opening', 'open']:
+            return
+
+        log.debug('socket close with reason: "%s"', reason)
+
+        # Clear ping interval timer
+        if self.ping_interval_timer:
+            self.ping_interval_timer.cancel()
+
+        self.ping_interval_timer = None
+
+        # Clear ping timeout timer
+        if self.ping_timeout_timer:
+            self.ping_timeout_timer.cancel()
+
+        self.ping_timeout_timer = None
+
+        # ensure transport won't stay open
+        self.transport.close()
+
+        # ignore further transport communication
+        self.transport.off()
+
+        # set ready state
+        self.ready_state = 'closed'
+
+        # clear session id
+        self.sid = None
+
+        # emit close event
+        self.emit('close', reason, desc)
+
+        # clean buffers after the `close` emit, so developers
+        # can still grab the buffers
+        self.write_buffer = []
+        self.callback_buffer = []
+        self.prev_buffer_len = 0
 
     def filter_upgrades(self, upgrades):
         """Filters upgrades, returning only those matching client transports.

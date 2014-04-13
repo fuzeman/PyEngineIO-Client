@@ -30,8 +30,9 @@ class XHR_Polling(Polling):
             self.on_error('Unknown method specified')
 
         def on_response(future):
-            if not future.done():
-                exc = future.exception()
+            exc = future.exception()
+
+            if exc:
                 self.on_error(exc.message)
                 return
 
