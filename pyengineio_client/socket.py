@@ -336,7 +336,15 @@ class Socket(Emitter):
 
     def close(self):
         """Closes the connection"""
-        raise NotImplementedError()
+        if self.ready_state not in ['open', 'opening']:
+            return self
+
+        self.on_close('forced close')
+
+        log.debug('socket closing - telling transport to close')
+        self.transport.close()
+
+        return self
 
     def on_error(self, message):
         """Called upon transport error"""
