@@ -455,6 +455,9 @@ class Socket(Emitter):
 
         self.ping_timeout_timer = None
 
+        # stop event from firing again for transport
+        self.transport.off('close')
+
         # ensure transport won't stay open
         self.transport.close()
 
