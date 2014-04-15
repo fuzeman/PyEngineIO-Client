@@ -194,7 +194,6 @@ class Socket(Emitter):
                             return
 
                         log.debug('changing transport and sending upgrade packet')
-
                         self.set_transport(transport)
 
                         transport.send([{'type': 'upgrade'}])
@@ -212,7 +211,7 @@ class Socket(Emitter):
             transport.send([{'type': 'ping', 'data': 'probe'}])
 
         @transport.once('error')
-        def transport_error(message):
+        def transport_error(exc):
             if failed.is_set():
                 return
 
@@ -220,14 +219,14 @@ class Socket(Emitter):
             failed.set()
             transport.close()
 
-            log.debug('probe transport "%s" failed because of error: %s', name, message)
-            self.emit('upgradeError', Exception('probe error: ' + message, transport.name))
+            log.debug('probe transport "%s" failed because of error: %s', name, exc.message)
+            self.emit('upgradeError', Exception('probe error: ' + exc.message, transport.name))
 
         # Open transport to start probe
         transport.open()
 
         @self.once('close')
-        def transport_close():
+        def transport_close(*args):
             if transport:
                 log.debug('socket closed prematurely - aborting probe')
                 failed.set()
