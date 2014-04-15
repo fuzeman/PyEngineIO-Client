@@ -1,6 +1,6 @@
 from pyengineio_client.transports import TRANSPORTS
 from pyengineio_client.url import parse_url
-from pyengineio_client.util import qs_parse
+from pyengineio_client.util import qs_decode
 
 from pyemitter import Emitter
 from threading import Timer, Event
@@ -42,7 +42,7 @@ class Socket(Emitter):
 
         self.query = opts.get('query') or {}
         if isinstance(self.query, basestring):
-            self.query = qs_parse(self.query)
+            self.query = qs_decode(self.query)
 
         self.upgrade = opts.get('upgrade', True)
 

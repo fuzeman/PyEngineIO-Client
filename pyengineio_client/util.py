@@ -1,7 +1,7 @@
 import urllib
 
 
-def qs(d):
+def qs_encode(d):
     result = ''
 
     for key, value in d.items():
@@ -13,7 +13,7 @@ def qs(d):
     return result
 
 
-def qs_parse(qs):
+def qs_decode(qs):
     qry = {}
 
     pairs = [p.split('=') for p in qs.split('&')]

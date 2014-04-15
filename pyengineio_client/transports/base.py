@@ -2,7 +2,7 @@ import time
 from pyengineio_client.exceptions import TransportError
 
 from pyemitter import Emitter
-from pyengineio_client.util import qs
+from pyengineio_client.util import qs_encode
 import pyengineio_parser as parser
 
 
@@ -113,7 +113,7 @@ class Transport(Emitter):
         if not self.supports_binary:
             query['b64'] = 1
 
-        query = qs(query)
+        query = qs_encode(query)
 
         # prepend ? to query
         if len(query):
