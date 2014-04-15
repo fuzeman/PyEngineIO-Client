@@ -1,1 +1,3 @@
 *.pyc
+
+/PyEngineIO_Client.egg-info
