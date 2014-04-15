@@ -1,6 +1,6 @@
-from pyengineio_client.util import qs
 from .base import Transport
 
+from threading import Semaphore
 import pyengineio_parser as parser
 import logging
 
@@ -34,8 +34,39 @@ class Polling(Transport):
         :param on_pause: callback upon buffers are flushed and transport is paused
         :type on_pause: function
         """
-        # TODO Polling.pause
-        raise NotImplementedError()
+        self.ready_state = 'pausing'
+
+        def do_pause():
+            log.debug('paused')
+            self.ready_state = 'paused'
+            on_pause()
+
+        if self.polling or not self.writable:
+            sem = Semaphore(int(self.polling) + int(not self.writable))
+
+            def complete_pause():
+                if not sem.acquire(blocking=False):
+                    do_pause()
+
+            if self.polling:
+                log.debug('we are currently polling - waiting to pause')
+
+                @self.once('pollComplete')
+                def poll_complete():
+                    log.debug('pre-pause polling complete')
+                    sem.acquire(blocking=False)
+                    complete_pause()
+
+            if not self.writable:
+                log.debug('we are currently writing - waiting to pause')
+
+                @self.once('drain')
+                def drain():
+                    log.debug('pre-pause writing complete')
+                    sem.acquire(blocking=False)
+                    complete_pause()
+        else:
+            do_pause()
 
     def poll(self):
         """Starts polling cycle."""

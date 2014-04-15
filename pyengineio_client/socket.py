@@ -3,7 +3,7 @@ from pyengineio_client.url import parse_url
 from pyengineio_client.util import qs_parse
 
 from pyemitter import Emitter
-from threading import Timer
+from threading import Timer, Event
 import pyengineio_parser as parser
 import json
 import logging
@@ -56,7 +56,7 @@ class Socket(Emitter):
         self.timestamp_param = opts.get('timestamp_param') or 't'
         self.timestamp_requests = opts.get('timestamp_requests')
 
-        self.transports = opts.get('transports') or ['websocket', 'polling']
+        self.transports = opts.get('transports') or ['polling', 'websocket']
 
         self.ready_state = ''
         self.write_buffer = []
@@ -140,7 +140,7 @@ class Socket(Emitter):
 
         if self.transport:
             log.debug('clearing existing transport %s', self.transport.name)
-            self.transport.removeAllListeners()
+            self.transport.off()
 
         # set up transport
         self.transport = transport
@@ -153,7 +153,92 @@ class Socket(Emitter):
 
     def probe(self, name):
         """Probes a transport."""
-        raise NotImplementedError()
+        log.debug('probing transport "%s"', name)
+
+        transport = self.create_transport(name)
+        failed = Event()
+
+        Socket.prior_websocket_success = False
+
+        @transport.once('open')
+        def transport_open():
+            if self.only_binary_upgrades:
+                upgrade_loses_binary = not transport.supports_binary and self.transport.supports_binary
+
+                if upgrade_loses_binary:
+                    failed.set()
+
+            if failed.is_set():
+                return
+
+            log.debug('probe transport "%s" opened', name)
+
+            @transport.once('packet')
+            def transport_packet(packet):
+                if failed.is_set():
+                    return
+
+                if packet.get('type') == 'pong' and packet.get('data') == 'probe':
+                    log.debug('probe transport "%s" pong', name)
+
+                    self.upgrading = True
+                    self.emit('upgrading', transport)
+
+                    Socket.prior_websocket_success = transport.name == 'websocket'
+
+                    def pause_callback():
+                        if failed.is_set():
+                            return
+
+                        if self.ready_state in ['closed', 'closing']:
+                            return
+
+                        log.debug('changing transport and sending upgrade packet')
+
+                        self.set_transport(transport)
+
+                        transport.send([{'type': 'upgrade'}])
+                        self.emit('upgrade', transport)
+
+                        self.upgrading = False
+                        self.flush()
+
+                    log.debug('pausing current transport "%s"', self.transport.name)
+                    self.transport.pause(pause_callback)
+                else:
+                    log.debug('probe transport "%s" failed', name)
+                    self.emit('upgradeError', Exception('probe error', transport))
+
+            transport.send([{'type': 'ping', 'data': 'probe'}])
+
+        @transport.once('error')
+        def transport_error(message):
+            if failed.is_set():
+                return
+
+            # Any callback called by transport should be ignored since now
+            failed.set()
+            transport.close()
+
+            log.debug('probe transport "%s" failed because of error: %s', name, message)
+            self.emit('upgradeError', Exception('probe error: ' + message, transport.name))
+
+        # Open transport to start probe
+        transport.open()
+
+        @self.once('close')
+        def transport_close():
+            if transport:
+                log.debug('socket closed prematurely - aborting probe')
+                failed.set()
+                transport.close()
+
+
+        @self.once('upgrading')
+        def transport_upgrading(to):
+            if transport and to.name != transport.name:
+                log.debug('"%s" works - aborting "%s"', to.name, transport.name)
+                transport.close()
 
     def on_open(self):
         """Called when connection is deemed open."""
@@ -163,7 +248,6 @@ class Socket(Emitter):
         Socket.prior_websocket_success = 'websocket' == self.transport.name
 
         self.emit('open')
-        # TODO this.onopen && this.onopen.call(this); ??
         self.flush()
 
         # we check for `readyState` in case an `open`
@@ -199,8 +283,6 @@ class Socket(Emitter):
             if p_type == 'message':
                 self.emit('data', p_data)
                 self.emit('message', p_data)
-
-                # TODO this.onmessage && this.onmessage.call(this, event);
                 return
 
         else:
@@ -352,7 +434,6 @@ class Socket(Emitter):
         Socket.prior_websocket_success = False
 
         self.emit('error', message)
-        # TODO this.onerror && this.onerror.call(this, err) ??
 
         self.on_close('transport error  %s' % message)
 

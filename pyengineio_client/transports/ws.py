@@ -29,23 +29,13 @@ class WebSocket(Transport):
     def do_open(self):
         """Opens socket."""
 
-        def ws_message(ws, data):
-            log.debug('ws_message data: %s', repr(data))
-            self.on_data(data)
-
-        def ws_close(ws):
-            log.debug('ws_close')
-            self.on_close()
-
-        websocket.enableTrace(True)
-
         self.ws = websocket.WebSocketApp(
             self.uri(),
 
             on_open=lambda ws: self.on_open(),
-            on_message=ws_message,
+            on_message=lambda ws, data: self.on_data(data),
             on_error=lambda ws, e: self.on_error(e.message),
-            on_close=ws_close
+            on_close=lambda ws: self.on_close()
         )
 
         self.thread = Thread(target=self.ws.run_forever)

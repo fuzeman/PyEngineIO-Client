@@ -7,6 +7,8 @@ import pyengineio_parser as parser
 
 
 class Transport(Emitter):
+    name = None
+
     protocol = None
     protocol_secure = None
 
@@ -49,7 +51,7 @@ class Transport(Emitter):
     def do_open(self):
         raise NotImplementedError()
 
-    def pause(self):
+    def pause(self, on_pause):
         raise NotImplementedError()
 
     def close(self):
