@@ -1,2 +1,4 @@
 requests
 requests-futures
+
+websocket-client

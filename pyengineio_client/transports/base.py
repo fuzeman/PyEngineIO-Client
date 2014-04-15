@@ -1,16 +1,23 @@
+import time
 from pyengineio_client.exceptions import TransportError
 
 from pyemitter import Emitter
+from pyengineio_client.util import qs
 import pyengineio_parser as parser
 
 
 class Transport(Emitter):
+    protocol = None
+    protocol_secure = None
+
     def __init__(self, opts):
         self.hostname = opts['hostname']
         self.port = opts['port']
         self.secure = opts['secure']
         self.path = opts['path']
         self.query = opts['query']
+
+        self.supports_binary = not (opts and opts.get('force_base64'))
 
         self.timestamp_param = opts['timestamp_param']
         self.timestamp_requests = opts['timestamp_requests']
@@ -40,6 +47,9 @@ class Transport(Emitter):
         return self
 
     def do_open(self):
+        raise NotImplementedError()
+
+    def pause(self):
         raise NotImplementedError()
 
     def close(self):
@@ -77,7 +87,6 @@ class Transport(Emitter):
 
         :type data: str
         """
-        print data
         self.on_packet(parser.decode_packet(data, self.socket.binary_type))
 
     def on_packet(self, packet):
@@ -87,4 +96,46 @@ class Transport(Emitter):
     def on_close(self):
         """Called upon close."""
         self.ready_state = 'closed'
-        self.emit('close')
+        self.emit('close', 'transport closed')
+
+    def uri(self):
+        query = self.query or {}
+        protocol = self.uri_protocol
+        port = self.uri_port
+
+        # add timestamp to query (if enabled)
+        if self.timestamp_requests:
+            query[self.timestamp_param] = int(time.time())
+
+        # communicate binary support capabilities
+        if not self.supports_binary:
+            query['b64'] = 1
+
+        query = qs(query)
+
+        # prepend ? to query
+        if len(query):
+            query = '?' + query
+
+        return '%s://%s:%s%s%s' % (
+            protocol, self.hostname, port,
+            self.path, query
+        )
+
+    @property
+    def uri_protocol(self):
+        return self.protocol_secure if self.secure else self.protocol
+
+    @property
+    def uri_port(self):
+        if not self.port:
+            return ''
+
+        # avoid port if default for schema
+        if self.secure and self.port != 443:
+            return self.port
+
+        if not self.secure and self.port != 80:
+            return self.port
+
+        return ''

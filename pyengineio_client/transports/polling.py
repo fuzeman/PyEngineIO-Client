@@ -10,14 +10,15 @@ log = logging.getLogger(__name__)
 class Polling(Transport):
     name = "polling"
 
+    protocol = 'http'
+    protocol_secure = 'https'
+
     def __init__(self, opts):
         """Polling interface.
 
         :type opts: dict
         """
         super(Polling, self).__init__(opts)
-
-        self.supports_binary = not (opts and opts.get('force_base64'))
 
         self.polling = False
 
@@ -34,7 +35,7 @@ class Polling(Transport):
         :type on_pause: function
         """
         # TODO Polling.pause
-        pass
+        raise NotImplementedError()
 
     def poll(self):
         """Starts polling cycle."""
@@ -103,26 +104,3 @@ class Polling(Transport):
 
     def do_write(self, data, callback):
         raise NotImplementedError()
-
-    def uri(self):
-        query = self.query or {}
-        schema = 'https' if self.secure else 'http'
-        port = ''
-
-        if not self.supports_binary and not query.sid:
-            query['b64'] = 1
-
-        query = qs(query)
-
-        # avoid port if default for schema
-        if self.port and (
-            ('https' == schema and self.port != 443) or
-            ('http' == schema and self.port != 80)
-        ):
-            port = ':%s' % self.port
-
-        # prepend ? to query
-        if len(query):
-            query = '?' + query
-
-        return schema + '://' + self.hostname + port + self.path + query

@@ -56,7 +56,7 @@ class Socket(Emitter):
         self.timestamp_param = opts.get('timestamp_param') or 't'
         self.timestamp_requests = opts.get('timestamp_requests')
 
-        self.transports = opts.get('transports') or ['polling']
+        self.transports = opts.get('transports') or ['websocket', 'polling']
 
         self.ready_state = ''
         self.write_buffer = []
@@ -149,7 +149,7 @@ class Socket(Emitter):
         transport.on('drain', self.on_drain)\
                  .on('packet', self.on_packet)\
                  .on('error', self.on_error)\
-                 .on('close', lambda: self.on_close('transport close'))
+                 .on('close', lambda *args, **kwargs: self.on_close('transport close'))
 
     def probe(self, name):
         """Probes a transport."""
@@ -293,12 +293,12 @@ class Socket(Emitter):
         if not self.transport.writable or not self.write_buffer:
             return
 
-        log.debug('flushing %d packets in socket', len(self.write_buffer))
-        self.transport.send(self.write_buffer)
-
         # keep track of current length of writeBuffer
         # splice writeBuffer and callbackBuffer on `drain`
         self.prev_buffer_len = len(self.write_buffer)
+
+        log.debug('flushing %d packets in socket', len(self.write_buffer))
+        self.transport.send(self.write_buffer)
 
         self.emit('flush')
 
@@ -356,7 +356,7 @@ class Socket(Emitter):
 
         self.on_close('transport error  %s' % message)
 
-    def on_close(self, reason, desc=None):
+    def on_close(self, reason=None, desc=None):
         """Called upon transport close"""
         if self.ready_state not in ['opening', 'open']:
             return
