@@ -113,7 +113,7 @@ class Polling(Transport):
         """For polling, send a close packet."""
         def close():
             log.debug('writing close packet')
-            self.write([{type: 'close'}])
+            self.write([{'type': 'close'}])
 
         if self.ready_state == 'open':
             log.debug('transport open - closing')

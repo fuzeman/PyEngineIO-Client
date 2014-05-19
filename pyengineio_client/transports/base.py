@@ -1,9 +1,9 @@
-import time
 from pyengineio_client.exceptions import TransportError
+from pyengineio_client.util import qs_encode
 
 from pyemitter import Emitter
-from pyengineio_client.util import qs_encode
 import pyengineio_parser as parser
+import time
 
 
 class Transport(Emitter):
