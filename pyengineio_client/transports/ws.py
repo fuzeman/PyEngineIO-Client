@@ -34,7 +34,7 @@ class WebSocket(Transport):
 
             on_open=lambda ws: self.on_open(),
             on_message=lambda ws, data: self.on_data(data),
-            on_error=lambda ws, e: self.on_error(e.message),
+            on_error=lambda ws, e: self.on_error(e),
             on_close=lambda ws: self.on_close()
         )
 
