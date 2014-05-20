@@ -219,7 +219,7 @@ class Socket(Emitter):
             failed.set()
             transport.close()
 
-            log.debug('probe transport "%s" failed because of error: %s', name, exc.message)
+            log.debug('probe transport "%s" failed because of error: %s', name, repr(exc))
             self.emit('upgradeError', Exception('probe error: ' + exc.message, transport.name))
 
         # Open transport to start probe
