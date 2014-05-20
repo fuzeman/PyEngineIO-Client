@@ -1,6 +1,7 @@
 from .polling import Polling
 
 from requests_futures.sessions import FuturesSession
+from httplib import IncompleteRead
 import logging
 
 log = logging.getLogger(__name__)
@@ -33,7 +34,11 @@ class XHR_Polling(Polling):
             exc = future.exception()
 
             if exc:
-                self.on_error(exc.message)
+                if type(exc.message) is IncompleteRead:
+                    self.on_error(exc.message.partial)
+                else:
+                    self.on_error(str(exc))
+
                 return
 
             response = future.result()
