@@ -64,7 +64,6 @@ class Socket(Emitter):
 
         self.remember_upgrade = opts.get('remember_upgrade', False)
 
-        self.binary_type = None
         self.only_binary_upgrades = opts.get('only_binary_upgrades')
 
         self.sid = None

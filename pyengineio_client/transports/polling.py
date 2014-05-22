@@ -96,7 +96,7 @@ class Polling(Transport):
             self.on_packet(packet)
 
         # decode payload
-        parser.decode_payload(data, callback, self.socket.binary_type)
+        parser.decode_payload(data, callback)
 
         # if an event did not trigger closing
         if self.ready_state != 'closed':

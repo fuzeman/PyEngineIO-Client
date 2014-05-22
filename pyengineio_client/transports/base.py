@@ -89,7 +89,7 @@ class Transport(Emitter):
 
         :type data: str
         """
-        self.on_packet(parser.decode_packet(data, self.socket.binary_type))
+        self.on_packet(parser.decode_packet(data))
 
     def on_packet(self, packet):
         """Called with a decoded packet."""
