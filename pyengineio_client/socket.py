@@ -89,7 +89,7 @@ class Socket(Emitter):
         :param name: transport name
         :type name: str
 
-        :rtype: Transport
+        :rtype: pyengineio_client.transports.base.Transport
         """
         log.debug('creating transport "%s"', name)
         query = self.query.copy()
@@ -219,7 +219,17 @@ class Socket(Emitter):
             transport.close()
 
             log.debug('probe transport "%s" failed because of error: %s', name, repr(exc))
-            self.emit('upgradeError', Exception('probe error: ' + exc.message, transport.name))
+            self.emit('upgradeError', Exception('probe error: %s' % exc.message, transport.name))
+
+        @transport.once('close')
+        def transport_close(reason, description=None):
+            if failed.is_set():
+                return
+
+            failed.set()
+
+            log.debug('probe transport "%s" failed, %s', name, reason)
+            self.emit('upgradeError', Exception('probe error: %s' % reason, transport.name))
 
         # Open transport to start probe
         transport.open()
