@@ -1,9 +1,9 @@
-import time
 from pyengineio_client.exceptions import TransportError
+from pyengineio_client.util import qs_encode
 
 from pyemitter import Emitter
-from pyengineio_client.util import qs_encode
 import pyengineio_parser as parser
+import time
 
 
 class Transport(Emitter):
@@ -11,6 +11,8 @@ class Transport(Emitter):
 
     protocol = None
     protocol_secure = None
+
+    timestamps = 0
 
     def __init__(self, opts):
         self.hostname = opts['hostname']
@@ -89,7 +91,7 @@ class Transport(Emitter):
 
         :type data: str
         """
-        self.on_packet(parser.decode_packet(data, self.socket.binary_type))
+        self.on_packet(parser.decode_packet(data))
 
     def on_packet(self, packet):
         """Called with a decoded packet."""
@@ -107,7 +109,8 @@ class Transport(Emitter):
 
         # add timestamp to query (if enabled)
         if self.timestamp_requests:
-            query[self.timestamp_param] = int(time.time())
+            query[self.timestamp_param] = '%s-%s' % (time.time(), Transport.timestamps)
+            Transport.timestamps += 1
 
         # communicate binary support capabilities
         if not self.supports_binary:

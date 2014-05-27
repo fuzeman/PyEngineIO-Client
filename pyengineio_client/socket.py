@@ -54,7 +54,7 @@ class Socket(Emitter):
         self.force_base64 = opts.get('force_base64', False)
 
         self.timestamp_param = opts.get('timestamp_param') or 't'
-        self.timestamp_requests = opts.get('timestamp_requests')
+        self.timestamp_requests = opts.get('timestamp_requests', True)
 
         self.transports = opts.get('transports') or ['polling', 'websocket']
 
@@ -64,7 +64,6 @@ class Socket(Emitter):
 
         self.remember_upgrade = opts.get('remember_upgrade', False)
 
-        self.binary_type = None
         self.only_binary_upgrades = opts.get('only_binary_upgrades')
 
         self.sid = None
@@ -90,7 +89,7 @@ class Socket(Emitter):
         :param name: transport name
         :type name: str
 
-        :rtype: Transport
+        :rtype: pyengineio_client.transports.base.Transport
         """
         log.debug('creating transport "%s"', name)
         query = self.query.copy()
@@ -219,8 +218,18 @@ class Socket(Emitter):
             failed.set()
             transport.close()
 
-            log.debug('probe transport "%s" failed because of error: %s', name, exc.message)
-            self.emit('upgradeError', Exception('probe error: ' + exc.message, transport.name))
+            log.debug('probe transport "%s" failed because of error: %s', name, repr(exc))
+            self.emit('upgradeError', Exception('probe error: %s' % exc.message, transport.name))
+
+        @transport.once('close')
+        def transport_close(reason, description=None):
+            if failed.is_set():
+                return
+
+            failed.set()
+
+            log.debug('probe transport "%s" failed, %s', name, reason)
+            self.emit('upgradeError', Exception('probe error: %s' % reason, transport.name))
 
         # Open transport to start probe
         transport.open()
