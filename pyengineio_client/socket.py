@@ -54,7 +54,7 @@ class Socket(Emitter):
         self.force_base64 = opts.get('force_base64', False)
 
         self.timestamp_param = opts.get('timestamp_param') or 't'
-        self.timestamp_requests = opts.get('timestamp_requests')
+        self.timestamp_requests = opts.get('timestamp_requests', True)
 
         self.transports = opts.get('transports') or ['polling', 'websocket']
 

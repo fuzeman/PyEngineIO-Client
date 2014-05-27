@@ -12,6 +12,8 @@ class Transport(Emitter):
     protocol = None
     protocol_secure = None
 
+    timestamps = 0
+
     def __init__(self, opts):
         self.hostname = opts['hostname']
         self.port = opts['port']
@@ -107,7 +109,8 @@ class Transport(Emitter):
 
         # add timestamp to query (if enabled)
         if self.timestamp_requests:
-            query[self.timestamp_param] = int(time.time())
+            query[self.timestamp_param] = '%s-%s' % (time.time(), Transport.timestamps)
+            Transport.timestamps += 1
 
         # communicate binary support capabilities
         if not self.supports_binary:
