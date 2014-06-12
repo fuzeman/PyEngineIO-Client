@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='PyEngineIO-Client',
@@ -9,7 +9,7 @@ setup(
     author_email='me@dgardiner.net',
 
     description='Client for engine.io',
-    packages=['pyengineio_client'],
+    packages=find_packages(),
     platforms='any',
 
     install_requires=[
