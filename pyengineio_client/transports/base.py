@@ -122,8 +122,9 @@ class Transport(Emitter):
         if len(query):
             query = '?' + query
 
-        return '%s://%s:%s%s%s' % (
-            protocol, self.hostname, port,
+        return '%s://%s%s%s%s' % (
+            protocol, self.hostname,
+            (':%s' % port) if port else '',
             self.path, query
         )
 
@@ -134,7 +135,7 @@ class Transport(Emitter):
     @property
     def uri_port(self):
         if not self.port:
-            return ''
+            return None
 
         # avoid port if default for schema
         if self.secure and self.port != 443:
@@ -143,4 +144,4 @@ class Transport(Emitter):
         if not self.secure and self.port != 80:
             return self.port
 
-        return ''
+        return None
