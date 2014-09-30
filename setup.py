@@ -1,15 +1,15 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='PyEngineIO-Client',
-    version='1.2.1-beta',
+    version='1.2.1.1-beta',
     url='http://github.com/fuzeman/PyEngineIO-Client/',
 
     author='Dean Gardiner',
     author_email='me@dgardiner.net',
 
     description='Client for engine.io',
-    packages=['pyengineio_client'],
+    packages=find_packages(),
     platforms='any',
 
     install_requires=[
